@@ -1,34 +1,50 @@
 from flask import Flask, jsonify
-import mysql.connector
 import os
+import mysql.connector
 
+#flask app instance update
 app = Flask(__name__)
 
-# Database config (paikallisesti docker-composen env:stä, tuotannossa Kubernetes-secreteistä)
-db_config = {
-    'user': 'root',
-    'password': os.getenv('MYSQL_ROOT_PASSWORD', 'test_password'),
-    'host': 'mysql',
-    'database': 'test_db'
-}
+DB_HOST = os.getenv('DB_HOST', 'db')
+DB_USER = os.getenv('DB_USER', 'appuser')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'changeme')
+DB_NAME = os.getenv('DB_NAME', 'appdb')
 
-@app.route('/health')
+@app.get('/api/health')
 def health():
-    return jsonify({'status': 'healthy'})
+    return jsonify(message={'status': 'ok'})
 
-# Uusi toiminnallisuus: Hae käyttäjät MySQL:stä
-@app.route('/api/users', methods=['GET'])
-def get_users():
-    try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM users")  # Olettaen taulu 'users' (id, name)
-        users = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return jsonify([{'id': row[0], 'name': row[1]} for row in users])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@app.get('/api/time')
+def time():
+    # Placeholder for actual time fetching logic
+    #get server time from db
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+    )
+    cur = conn.cursor()
+    cur.execute("SELECT NOW()")
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return jsonify(message={'time': row[0]})
+
+@app.get('/api')
+def index():
+    """Simple endpoint that greets from DB."""
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+    )
+    cur = conn.cursor()
+    cur.execute("SELECT 'Hello from MySQL via Testi!'")
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return jsonify(message=row[0])
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Dev-only fallback
+    app.run(host='0.0.0.0', port=8000, debug=True)
